@@ -212,7 +212,7 @@ def Bin_data(Bins,Pixels,min_x,min_y, output_directory, filename):
 # The goal of this subroutine is simply to fill each
 # pixels neighbor list so that the required
 # signal-to-noise is achieved
-def Signal_Complete(pixel,Pixels,StN_Target):
+def Signal_Complete(pixel,Pixels,StN_Target,output_dir,out_name):
     Current_bin = Bin(pixel.pix_number)
     Current_bin.add_pixel(pixel)
     # Lets add pixels to the bin until the Signal to Noise is reached
@@ -228,22 +228,31 @@ def Signal_Complete(pixel,Pixels,StN_Target):
         if neigh_num >= len(neighbors_unsearched):
             i += 1  # So we can search further!
             neighbors_unsearched = Nearest_Neighbors_ind(Pixels, 10 ** (i + 1), pixel.pix_number)
-    return Current_bin
+    #print(Current_bin.pixels)
+    with lock:
+        file_out = open(output_dir+'/'+out_name+'.txt','a')
+        for pixel_ in Current_bin.pixels:
+            file_out.write(str(pixel.pix_number)+" "+str(pixel_.pix_x)+" "+str(pixel_.pix_y)+'\n')
+        file_out.close()
+    return 0
 #-------------------------------------------------#
 #-------------------------------------------------#
 # Bin_Creation Algorithm Parallelized
 #   parameters:
 #       Pixels - list of unique pixels
 #       StN_Target - Target value of Signal-to_noise
-def Bin_Creation_Par(Pixels,StN_Target,set_processes=1):
+def Bin_Creation_Par(Pixels,StN_Target,output_dir,out_name,set_processes=1):
     #step 1:setup list of bin objects
     print("Starting Bin Accretion Algorithm")
+    file_out = open(output_dir+'/'+out_name+".txt","w+")
+    file_out.write("Bin Pixel_X Pixel_Y \n")
+    file_out.close()
     pool = mp.Pool(processes=set_processes)
-    results = [pool.apply_async(Signal_Complete,args=(pixel,Pixels[:],StN_Target,)) for pixel in Pixels[:]]
+    results = [pool.apply_async(Signal_Complete,args=(pixel,Pixels[:],StN_Target,output_dir,out_name,)) for pixel in Pixels[:]]
     Bin_list = [p.get() for p in results]
     print("Completed Bin Accretion Algorithm")
-    print("There are a total of "+str(len(Bin_list))+" bins!")
-    return Bin_list
+    #print("There are a total of "+str(len(Bin_list))+" bins!")
+    return None
 #-------------------------------------------------#
 #-------------------------------------------------#
 #Read input file
@@ -290,9 +299,9 @@ def main():
     print("#----------------Algorithm Part 1----------------#")
     Pixels,min_x,max_x,min_y,max_y = read_in(inputs['image_fits'],inputs['exposure_map'])
     start = time.time()
-    Bins = Bin_Creation_Par(Pixels, inputs['stn_target'],int(inputs['num_processes']))
+    Bins = Bin_Creation_Par(Pixels, inputs['stn_target'],inputs['output_dir'],"pix_data",int(inputs['num_processes']))
     print("The binning took %.2f seconds"%(float(time.time()-start)))
     print("#----------------Algorithm Complete--------------#")
-    Bin_data(Bins,Pixels,min_x,min_y,inputs['output_dir'],"pix_data")
+    #Bin_data(Bins,Pixels,min_x,min_y,inputs['output_dir'],"pix_data")
     print("#----------------Information Stored--------------#")
 main()
