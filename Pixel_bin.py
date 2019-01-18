@@ -234,7 +234,7 @@ def Signal_Complete(pixel,Pixels,StN_Target,output_dir,out_name):
         for pixel_ in Current_bin.pixels:
             file_out.write(str(pixel.pix_number)+" "+str(pixel_.pix_x)+" "+str(pixel_.pix_y)+'\n')
         file_out.close()
-    return 0
+    return None
 #-------------------------------------------------#
 #-------------------------------------------------#
 # Bin_Creation Algorithm Parallelized
@@ -299,9 +299,8 @@ def main():
     print("#----------------Algorithm Part 1----------------#")
     Pixels,min_x,max_x,min_y,max_y = read_in(inputs['image_fits'],inputs['exposure_map'])
     start = time.time()
-    Bins = Bin_Creation_Par(Pixels, inputs['stn_target'],inputs['output_dir'],"pix_data",int(inputs['num_processes']))
+    Bin_Creation_Par(Pixels, inputs['stn_target'],inputs['output_dir'],"pix_data",int(inputs['num_processes']))
     print("The binning took %.2f seconds"%(float(time.time()-start)))
     print("#----------------Algorithm Complete--------------#")
-    #Bin_data(Bins,Pixels,min_x,min_y,inputs['output_dir'],"pix_data")
     print("#----------------Information Stored--------------#")
 main()
