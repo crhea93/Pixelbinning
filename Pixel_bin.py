@@ -26,6 +26,7 @@ carterrhea93@gmail.com
 
 #-----------------INPUTS--------------------------#
 import os
+import gc
 import sys
 import time
 import threading
@@ -126,31 +127,6 @@ def read_in(image_fits,exposure_map = 'none'):
     return Pixels, x_min, x_max, y_min, y_max
 #-------------------------------------------------#
 #-------------------------------------------------#
-# CALCULATE NearestNeighbors -- REALLY AN ADJACENCY LIST
-#   http://scikit-learn.org/stable/modules/neighbors.html
-#   parameters:
-#       pixel_list - list of pixel objects
-def Nearest_Neighbors(pixel_list):
-    xvals = []
-    yvals = []
-    num_neigh = 100
-    for pixel in pixel_list:
-        xvals.append(pixel.pix_x)
-        yvals.append(pixel.pix_y)
-    X = np.column_stack((xvals,yvals))
-    nbrs = NearestNeighbors(n_neighbors=num_neigh, algorithm='ball_tree').fit(X)
-    distances, indices = nbrs.kneighbors(X)
-    pix_num = 0
-    for pixel in pixel_list:
-        for j in range(num_neigh-1):
-            if distances[pix_num][j+1] == 1:
-                index = indices[pix_num][j+1]
-                pixel.add_neighbor(pixel_list[index],xvals[index],yvals[index])
-            else:
-                pass #not adjacent
-        pix_num += 1
-    return None
-#-------------------------------------------------#
 # CALCULATE NearestNeighbors
 #   http://scikit-learn.org/stable/modules/neighbors.html
 #   parameters:
@@ -214,15 +190,19 @@ def Bin_data(Bins,Pixels,min_x,min_y, output_directory, filename):
 # signal-to-noise is achieved
 def Signal_Complete(pixel,Pixels,StN_Target,output_dir,out_name):
     Current_bin = Bin(pixel.pix_number)
-    Current_bin.add_pixel(pixel)
+    current_pixels = [pixel]
+    #Current_bin.add_pixel(pixel)
     # Lets add pixels to the bin until the Signal to Noise is reached
+    StN = pixel.StN
     StN_found = False
     neigh_num = 0
     i = 0  # how many times we have calculated nearest neighbors
     neighbors_unsearched = Nearest_Neighbors_ind(Pixels, 10 ** (i + 1), pixel.pix_number)
     while StN_found == False:
-        Current_bin.add_pixel(neighbors_unsearched[neigh_num])
-        if Current_bin.StN > StN_Target:
+        #Current_bin.add_pixel(neighbors_unsearched[neigh_num])
+        current_pixels.append(neighbors_unsearched[neigh_num])
+        StN = neighbors_unsearched[neigh_num].StN
+        if StN > StN_Target:
             StN_found = True
         neigh_num += 1
         if neigh_num >= len(neighbors_unsearched):
@@ -234,6 +214,14 @@ def Signal_Complete(pixel,Pixels,StN_Target,output_dir,out_name):
         for pixel_ in Current_bin.pixels:
             file_out.write(str(pixel.pix_number)+" "+str(pixel_.pix_x)+" "+str(pixel_.pix_y)+'\n')
         file_out.close()
+    #print(sys.getrefcount(current_pixels))
+    print("Thread")
+    gc.collect()
+    del Current_bin; del current_pixels; del neighbors_unsearched; del StN_found; del neigh_num; del i
+    for name in dir():
+        if name.startswith('Current') or name.startswith("current"):
+            del globals()[name]
+
     return None
 #-------------------------------------------------#
 #-------------------------------------------------#
@@ -248,8 +236,8 @@ def Bin_Creation_Par(Pixels,StN_Target,output_dir,out_name,set_processes=1):
     file_out.write("Bin Pixel_X Pixel_Y \n")
     file_out.close()
     pool = mp.Pool(processes=set_processes)
-    results = [pool.apply_async(Signal_Complete,args=(pixel,Pixels[:],StN_Target,output_dir,out_name,)) for pixel in Pixels[:]]
-    Bin_list = [p.get() for p in results]
+    results = [pool.map(Signal_Complete,args=(pixel,Pixels[:],StN_Target,output_dir,out_name,)) for pixel in Pixels[:]]
+    #Bin_list = [p.get() for p in results]
     print("Completed Bin Accretion Algorithm")
     #print("There are a total of "+str(len(Bin_list))+" bins!")
     return None
